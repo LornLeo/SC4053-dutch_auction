@@ -1,0 +1,52 @@
+# Frontend test evidence (R6). Regenerate: cd frontend; npm test   and   npx hardhat test test/FrontendParity.test.js
+# Run: 2026-11-04T04:57Z on commit 6b783a5 + R6 tests
+
+## frontend: npm test (Vitest)
+
+ RUN  v2.1.9 C:/Users/14246/OneDrive/Desktop/dutch_auction/SC4053-dutch_auction/frontend
+
+ ✓ src/lib/auctionMath.test.js > priceAt (DESIGN.md §5) > returns startPrice before start()
+ ✓ src/lib/auctionMath.test.js > priceAt (DESIGN.md §5) > is startPrice at t = 0
+ ✓ src/lib/auctionMath.test.js > priceAt (DESIGN.md §5) > drops 0.00075 ETH per second
+ ✓ src/lib/auctionMath.test.js > priceAt (DESIGN.md §5) > is 0.55 ETH at 10 minutes
+ ✓ src/lib/auctionMath.test.js > priceAt (DESIGN.md §5) > is the reserve at 20 minutes and after
+ ✓ src/lib/auctionMath.test.js > priceAt (DESIGN.md §5) > never goes above startPrice for a clock slightly behind startTime
+ ✓ src/lib/auctionMath.test.js > supply maths > maxCommit = supply * price / 1e18
+ ✓ src/lib/auctionMath.test.js > supply maths > remaining ETH is clamped at zero
+ ✓ src/lib/auctionMath.test.js > supply maths > tokensForEth rounds down like the contract
+ ✓ src/lib/auctionMath.test.js > supply maths > progress is in basis points and capped at 100%
+ ✓ src/lib/auctionMath.test.js > bidEstimate (crossing bid, DESIGN.md §6 step 6) > accepts a bid below the sell-out amount in full
+ ✓ src/lib/auctionMath.test.js > bidEstimate (crossing bid, DESIGN.md §6 step 6) > splits a crossing bid into accepted and refundable
+ ✓ src/lib/auctionMath.test.js > bidEstimate (crossing bid, DESIGN.md §6 step 6) > treats an exact fill as the sell-out bid (contract uses >=) with nothing refundable
+ ✓ src/lib/auctionMath.test.js > deriveStatus (FRONTEND_SPEC.md §4) > covers every status in priority order
+ ✓ src/lib/auctionMath.test.js > deriveStatus (FRONTEND_SPEC.md §4) > only Sold out and Ended allow finalize()
+ ✓ src/lib/auctionMath.test.js > timeLeft > is the full duration before start and zero after the end
+ ✓ src/lib/auctionMath.test.js > claimPreview = tokensFor / refundFor (DESIGN.md §7) > matches the recorded on-chain claim from the manual E2E run
+ ✓ src/lib/auctionMath.test.js > claimPreview = tokensFor / refundFor (DESIGN.md §7) > conserves wei: cost + refund == bids + excess
+ ✓ src/lib/auctionMath.test.js > claimPreview = tokensFor / refundFor (DESIGN.md §7) > is zero before a clearing price exists
+ ✓ src/lib/format.test.js > format > truncates (never rounds up) and groups thousands
+ ✓ src/lib/format.test.js > format > formats countdowns as mm:ss
+ ✓ src/lib/format.test.js > format > shortens addresses
+ ✓ src/lib/format.test.js > decodeError > reports a wallet rejection as cancelled, not as a failure
+ ✓ src/lib/format.test.js > decodeError > uses ethers' decoded revert name when present
+ ✓ src/lib/format.test.js > decodeError > finds nested revert data and maps it to a plain-English message
+ ✓ src/lib/format.test.js > decodeError > falls back to the short message
+
+ Test Files  2 passed (2)
+      Tests  26 passed (26)
+   Start at  12:57:49
+   Duration  1.35s (transform 57ms, setup 0ms, collect 366ms, tests 10ms, environment 0ms, prepare 691ms)
+
+
+## root: npx hardhat test test/FrontendParity.test.js
+
+
+  Frontend maths parity with DutchAuction
+    ✔ priceAt() equals currentPrice() at every sampled block timestamp (543ms)
+    ✔ bidEstimate() at the mining timestamp predicts BidPlaced exactly for a crossing bid (60ms)
+    ✔ claimPreview() equals tokensFor()/refundFor() for every bidder after finalize
+    ✔ 'Demand met' status matches the contract: bid() and finalize() both revert (48ms)
+
+
+  4 passing (683ms)
+
