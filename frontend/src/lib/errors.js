@@ -33,6 +33,18 @@ function findRevertData(err) {
   return null;
 }
 
+/**
+ * True when the RPC endpoint itself is unreachable (ISSUE-010). Through the Vite /rpc proxy a stopped
+ * node is not a NETWORK_ERROR: the proxy answers HTTP 500/502/504, which ethers reports as SERVER_ERROR.
+ */
+export function isNodeUnreachable(err) {
+  const code = err?.code;
+  if (code === "NETWORK_ERROR" || code === "TIMEOUT" || code === "ECONNREFUSED") return true;
+  if (code === "SERVER_ERROR") return true;
+  const msg = `${err?.shortMessage ?? ""} ${err?.message ?? ""}`;
+  return /ECONNREFUSED|Failed to fetch|NetworkError|server response 5\d\d/i.test(msg);
+}
+
 /** Returns { cancelled?, name?, message } for any error thrown by ethers or the wallet. */
 export function decodeError(err, iface) {
   const code = err?.code ?? err?.info?.error?.code;

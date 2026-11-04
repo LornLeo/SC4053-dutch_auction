@@ -11,6 +11,7 @@ import {
   tokensForEth,
 } from "../lib/auctionMath.js";
 import { chainNow, nextAnchor } from "../lib/chainClock.js";
+import { isNodeUnreachable } from "../lib/errors.js";
 
 const POLL_MS = 2000;
 
@@ -132,7 +133,7 @@ export function useAuction(account) {
       });
       setError(null);
     } catch (e) {
-      setError(e?.code === "NETWORK_ERROR" || e?.code === "ECONNREFUSED" ? "no-node" : e?.shortMessage || e?.message);
+      setError(isNodeUnreachable(e) ? "no-node" : e?.shortMessage || e?.message);
     }
   }, [account]);
 

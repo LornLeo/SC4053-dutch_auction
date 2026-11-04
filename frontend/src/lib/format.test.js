@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { Interface } from "ethers";
 import { formatCountdown, formatEth, formatTokens, shortAddr } from "./format.js";
-import { decodeError } from "./errors.js";
+import { decodeError, isNodeUnreachable } from "./errors.js";
+
+describe("isNodeUnreachable (ISSUE-010)", () => {
+  it("treats the proxy's 500 for a stopped node as unreachable", () => {
+    // Exact shape seen in the E2E run with the node stopped behind the Vite proxy.
+    expect(isNodeUnreachable({ code: "SERVER_ERROR", shortMessage: "server response 500 Internal Server Error" })).toBe(true);
+    expect(isNodeUnreachable({ code: "NETWORK_ERROR" })).toBe(true);
+    expect(isNodeUnreachable(new TypeError("Failed to fetch"))).toBe(true);
+  });
+  it("does not hide contract or call errors", () => {
+    expect(isNodeUnreachable({ code: "CALL_EXCEPTION", shortMessage: "execution reverted" })).toBe(false);
+    expect(isNodeUnreachable({ code: "BAD_DATA" })).toBe(false);
+  });
+});
 
 describe("format", () => {
   it("truncates (never rounds up) and groups thousands", () => {
