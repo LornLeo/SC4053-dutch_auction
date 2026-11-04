@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getAddress, isAddress } from "ethers";
 import { useWallet } from "../context/WalletContext.jsx";
 import { useTx } from "../context/TxContext.jsx";
@@ -108,14 +108,22 @@ export function SettlementCard({ a }) {
   const finalizable = canFinalize(a.status);
   const valid = isAddress(bidder.trim());
 
-  const lookup = async (value) => {
-    setBidder(value);
+  // ISSUE-009: re-check what the bidder is owed on every new block (so a settled bidder disables
+  // the button), ignore out-of-order answers while typing, and never leave a rejected promise.
+  useEffect(() => {
     setCheck(null);
-    if (!isAddress(value.trim())) return;
-    const addr = getAddress(value.trim());
-    const [bids, excess] = await Promise.all([readAuction.bids(addr), readAuction.excess(addr)]);
-    setCheck({ addr, owed: bids > 0n || excess > 0n });
-  };
+    if (!isAddress(bidder.trim())) return undefined;
+    const addr = getAddress(bidder.trim());
+    let stale = false;
+    Promise.all([readAuction.bids(addr), readAuction.excess(addr)])
+      .then(([bids, excess]) => !stale && setCheck({ addr, owed: bids > 0n || excess > 0n }))
+      .catch(() => !stale && setCheck(null));
+    return () => {
+      stale = true;
+    };
+  }, [bidder, a.blockNumber]);
+
+  const lookup = (value) => setBidder(value);
 
   return (
     <section className="card">
@@ -151,7 +159,7 @@ export function SettlementCard({ a }) {
             />
             <button
               className="btn"
-              disabled={!w.canWrite || !valid || check?.owed === false || tx.busy("claimFor")}
+              disabled={!w.canWrite || !valid || !check?.owed || tx.busy("claimFor")}
               onClick={() =>
                 tx.run("claimFor", `Settle ${shortAddr(bidder)}`, () => auction().claimFor(getAddress(bidder.trim())))
               }

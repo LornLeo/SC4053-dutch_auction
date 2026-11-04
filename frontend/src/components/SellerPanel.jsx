@@ -10,6 +10,7 @@ export function SellerPanel({ a }) {
   const w = useWallet();
   const tx = useTx();
   const [progress, setProgress] = useState(null);
+  const [settling, setSettling] = useState(false); // ISSUE-009: busy for the whole loop, not per tx
 
   const isSeller = w.account && a.view.seller.toLowerCase() === w.account.toLowerCase();
   if (!isSeller) return null;
@@ -20,15 +21,22 @@ export function SellerPanel({ a }) {
   const bidders = [...new Set(a.events.filter((e) => e.name === "BidPlaced").map((e) => e.args.bidder))];
 
   const settleAll = async () => {
-    const owed = [];
-    for (const b of bidders) {
-      const [bids, excess] = await Promise.all([readAuction.bids(b), readAuction.excess(b)]);
-      if (bids > 0n || excess > 0n) owed.push(b);
-    }
-    setProgress({ done: 0, total: owed.length });
-    for (let i = 0; i < owed.length; i++) {
-      await tx.run("settleAll", `Settle ${shortAddr(owed[i])}`, () => auction().claimFor(owed[i]));
-      setProgress({ done: i + 1, total: owed.length });
+    if (settling) return;
+    setSettling(true);
+    try {
+      const owed = [];
+      for (const b of bidders) {
+        const [bids, excess] = await Promise.all([readAuction.bids(b), readAuction.excess(b)]);
+        if (bids > 0n || excess > 0n) owed.push(b);
+      }
+      setProgress({ done: 0, total: owed.length });
+      let done = 0;
+      for (const b of owed) {
+        if (await tx.run("settleAll", `Settle ${shortAddr(b)}`, () => auction().claimFor(b))) done++;
+        setProgress({ done, total: owed.length });
+      }
+    } finally {
+      setSettling(false);
     }
   };
 
@@ -52,10 +60,10 @@ export function SellerPanel({ a }) {
         </button>
         <button
           className="btn"
-          disabled={!a.view.finalized || !w.canWrite || tx.busy("settleAll") || bidders.length === 0}
+          disabled={!a.view.finalized || !w.canWrite || settling || bidders.length === 0}
           onClick={settleAll}
         >
-          Settle all bidders
+          {settling ? "Settling…" : "Settle all bidders"}
         </button>
       </div>
       {progress && (
