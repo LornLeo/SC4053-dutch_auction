@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { BrowserProvider, getAddress } from "ethers";
-import { CONFIG, readProvider } from "../lib/contract.js";
+import { CONFIG, POLLING_MS, readProvider } from "../lib/contract.js";
 
 // Wallet layer (FRONTEND_SPEC.md §3): MetaMask, or one of the local node's unlocked test accounts.
 const WalletContext = createContext(null);
@@ -35,6 +35,7 @@ export function WalletProvider({ children }) {
   const syncMetaMask = useCallback(async () => {
     // A fresh BrowserProvider each time: ethers caches the network, which goes stale after chainChanged.
     const provider = new BrowserProvider(window.ethereum);
+    provider.pollingInterval = POLLING_MS; // ISSUE-007: default 4 s receipt polling
     const accounts = await provider.send("eth_accounts", []);
     if (!accounts.length) {
       setState(EMPTY);

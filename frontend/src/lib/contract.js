@@ -8,7 +8,10 @@ export const CONFIG = config;
 export const RPC_URL = import.meta.env.VITE_RPC_URL || `${window.location.origin}/rpc`;
 
 const network = Network.from(config.chainId);
-export const readProvider = new JsonRpcProvider(RPC_URL, network, { staticNetwork: network });
+// ethers polls for receipts every 4 s by default; a local node mines instantly, so 1 s keeps the
+// "Pending" toast in step with the data (ISSUE-007).
+export const POLLING_MS = 1000;
+export const readProvider = new JsonRpcProvider(RPC_URL, network, { staticNetwork: network, pollingInterval: POLLING_MS });
 
 export const auctionIface = new Interface(config.auction.abi);
 export const readAuction = new Contract(config.auction.address, config.auction.abi, readProvider);
