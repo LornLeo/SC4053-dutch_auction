@@ -1,4 +1,5 @@
 const hre = require("hardhat");
+const { exportToFrontend } = require("./exportFrontend");
 const E = hre.ethers.parseEther;
 
 // Demo helper: deploy, start the auction and place bids from several accounts.
@@ -12,6 +13,7 @@ async function main() {
   await auction.waitForDeployment();
   console.log("DutchAuction:", await auction.getAddress());
   console.log("AuctionToken:", await auction.token());
+  await exportToFrontend(hre, auction);
 
   await (await auction.start()).wait();
   console.log("Auction started");

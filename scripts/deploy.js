@@ -1,4 +1,5 @@
 const hre = require("hardhat");
+const { exportToFrontend } = require("./exportFrontend");
 const E = hre.ethers.parseEther;
 
 // Deploys a DutchAuction locally and prints addresses. Run a local node first:
@@ -13,6 +14,7 @@ async function main() {
   console.log("Seller:        ", seller.address);
   console.log("DutchAuction:  ", await auction.getAddress());
   console.log("AuctionToken:  ", token);
+  await exportToFrontend(hre, auction);
   console.log("Call start() to begin the 20-minute clock (scripts/seed.js does this for the demo).");
 }
 
