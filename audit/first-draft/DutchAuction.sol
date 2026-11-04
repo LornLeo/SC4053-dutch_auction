@@ -1,0 +1,179 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IDutchAuction} from "./IDutchAuction.sol";
+import {AuctionToken} from "./AuctionToken.sol";
+
+/// @title DutchAuction
+/// @notice 20-minute descending-price auction with a uniform clearing price.
+///         See SPEC.md and DESIGN.md. Units: tokens in base units (1e18 = 1 token),
+///         ETH in wei, prices in wei per whole token.
+contract DutchAuction is IDutchAuction, ReentrancyGuard {
+    uint256 public constant DURATION = 20 minutes;
+    uint256 private constant UNIT = 1e18;
+
+    address public immutable seller;
+    AuctionToken public immutable token;
+    uint256 public immutable override tokenSupply;
+    uint256 public immutable override startPrice;
+    uint256 public immutable override reservePrice;
+
+    uint256 public override startTime;
+    uint256 public override endTime;
+
+    uint256 public override totalCommitted;
+    mapping(address => uint256) public override bids;
+    mapping(address => uint256) public excess; // surplus ETH from the crossing bid
+
+    bool public soldOut;
+    bool public override finalized;
+    uint256 public override clearingPrice;
+    uint256 public tokensSold;
+    uint256 public proceeds; // accrued in claim(), withdrawn by seller
+
+    constructor(
+        string memory name_,
+        string memory symbol_,
+        uint256 supply_,
+        uint256 startPrice_,
+        uint256 reservePrice_
+    ) {
+        if (supply_ == 0 || reservePrice_ == 0 || startPrice_ <= reservePrice_) revert InvalidParams();
+        seller = msg.sender;
+        tokenSupply = supply_;
+        startPrice = startPrice_;
+        reservePrice = reservePrice_;
+        token = new AuctionToken(name_, symbol_, address(this), supply_);
+    }
+
+    // ------------------------------------------------------------------
+    // Actions
+    // ------------------------------------------------------------------
+
+    function start() external override {
+        if (msg.sender != seller) revert NotSeller();
+        if (startTime != 0) revert AlreadyStarted();
+        startTime = block.timestamp;
+        endTime = block.timestamp + DURATION;
+        emit AuctionStarted(startTime, endTime);
+    }
+
+    function bid() external payable override nonReentrant {
+        if (msg.value == 0) revert ZeroBid();
+        if (startTime == 0) revert AuctionNotStarted();
+        if (block.timestamp >= endTime || soldOut) revert AuctionNotActive();
+
+        uint256 p = currentPrice();
+        uint256 maxCommit = (tokenSupply * p) / UNIT; // ETH needed to buy the whole supply at p
+        // Demand already meets supply at the current price (price fell between bids).
+        if (totalCommitted >= maxCommit) revert AuctionNotActive();
+
+        uint256 accepted = msg.value;
+        uint256 refundable = 0;
+        if (totalCommitted + msg.value >= maxCommit) {
+            // Crossing bid: accept only what is needed to sell out, rest is refundable at claim.
+            accepted = maxCommit - totalCommitted;
+            refundable = msg.value - accepted;
+            excess[msg.sender] += refundable;
+            soldOut = true;
+            clearingPrice = p;
+            emit AuctionCleared(p, totalCommitted + accepted);
+        }
+
+        bids[msg.sender] += accepted;
+        totalCommitted += accepted;
+        emit BidPlaced(msg.sender, accepted, refundable, p);
+    }
+
+    function finalize() external override nonReentrant {
+        if (startTime == 0) revert AuctionNotStarted();
+        if (finalized) revert AuctionAlreadyFinalized();
+        if (!soldOut && block.timestamp < endTime) revert AuctionNotEnded();
+
+        if (!soldOut) {
+            // Not cleared by a crossing bid: either never sold out (reserve price) or demand met
+            // supply between bids at price committed / supply (rounded up so claims never exceed supply).
+            uint256 impliedPrice = (totalCommitted * UNIT + tokenSupply - 1) / tokenSupply;
+            clearingPrice = impliedPrice > reservePrice ? impliedPrice : reservePrice;
+        }
+
+        uint256 sold = (totalCommitted * UNIT) / clearingPrice;
+        if (sold > tokenSupply) sold = tokenSupply;
+        tokensSold = sold;
+        finalized = true;
+
+        uint256 burned = tokenSupply - sold;
+        if (burned > 0) token.burn(burned);
+
+        emit AuctionFinalized(clearingPrice, sold, burned);
+    }
+
+    function claim() external override nonReentrant {
+        if (!finalized) revert AuctionNotFinalized();
+
+        uint256 committed = bids[msg.sender];
+        uint256 surplus = excess[msg.sender];
+        if (committed == 0 && surplus == 0) revert NothingToClaim();
+
+        uint256 tokens = (committed * UNIT) / clearingPrice; // rounds down
+        uint256 cost = (tokens * clearingPrice) / UNIT; // rounds down
+        uint256 refund = committed - cost + surplus;
+
+        // Effects before interactions.
+        bids[msg.sender] = 0;
+        excess[msg.sender] = 0;
+        proceeds += cost;
+
+        if (tokens > 0) {
+            bool ok = token.transfer(msg.sender, tokens);
+            if (!ok) revert TransferFailed();
+        }
+        if (refund > 0) {
+            (bool sent, ) = msg.sender.call{value: refund}("");
+            if (!sent) revert TransferFailed();
+        }
+        emit Claimed(msg.sender, tokens, refund);
+    }
+
+    function withdrawProceeds() external override nonReentrant {
+        if (msg.sender != seller) revert NotSeller();
+        if (!finalized) revert AuctionNotFinalized();
+
+        uint256 amount = proceeds;
+        proceeds = 0;
+        (bool sent, ) = seller.call{value: amount}("");
+        if (!sent) revert TransferFailed();
+        emit ProceedsWithdrawn(seller, amount);
+    }
+
+    // ------------------------------------------------------------------
+    // Views
+    // ------------------------------------------------------------------
+
+    function currentPrice() public view override returns (uint256) {
+        if (startTime == 0) return startPrice;
+        if (block.timestamp >= endTime) return reservePrice;
+        uint256 elapsed = block.timestamp - startTime;
+        return startPrice - ((startPrice - reservePrice) * elapsed) / DURATION;
+    }
+
+    function timeRemaining() external view override returns (uint256) {
+        if (startTime == 0) return DURATION;
+        if (block.timestamp >= endTime) return 0;
+        return endTime - block.timestamp;
+    }
+
+    function tokensFor(address bidder) external view override returns (uint256) {
+        if (!finalized) return 0;
+        return (bids[bidder] * UNIT) / clearingPrice;
+    }
+
+    function refundFor(address bidder) external view override returns (uint256) {
+        if (!finalized) return 0;
+        uint256 committed = bids[bidder];
+        uint256 tokens = (committed * UNIT) / clearingPrice;
+        uint256 cost = (tokens * clearingPrice) / UNIT;
+        return committed - cost + excess[bidder];
+    }
+}

@@ -1,0 +1,17 @@
+
+
+  DutchAuction (smoke)
+    ✔ rejects bids before start and non-seller start (492ms)
+    ✔ price decays linearly and floors at reserve
+    ✔ crossing bid: partial fill, uniform price, refund, burn, proceeds
+    ✔ never sells out: reserve price, unsold tokens burned
+    ✔ lazy clear: demand meets supply between bids
+    ✔ reentrancy attacker cannot claim twice
+
+  Part A review findings
+    ✔ ISSUE-003: a bidder who never claims leaves their ETH (and the seller's share) in the contract (41ms)
+    ✔ ISSUE-004: a contract bidder that cannot receive ETH cannot claim its tokens either
+
+
+  8 passing (634ms)
+

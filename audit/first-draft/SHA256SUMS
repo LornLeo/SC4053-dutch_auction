@@ -1,0 +1,4 @@
+796fdc44f94e165f9f2126bdbc603ca7b92af6e80f361bb92b470b693077ae35  audit/first-draft/AuctionToken.sol
+daa6320a739363ac39bafc50b436691c3bb0459e0f329be45fd58583a32e7e50  audit/first-draft/DutchAuction.sol
+fbb87936bcc343b8800932007a188dbcc0cee0911ef19175f881664e37373c56  audit/first-draft/IDutchAuction.sol
+f3b328d37b5aa05327d2d1b08a156186fadbf1cf743d808ee689a4474d04b777  audit/first-draft/ReentrancyAttacker.sol
