@@ -156,6 +156,7 @@ code,
   font-variant-numeric: tabular-nums;
 }
 .unit {
+  white-space: nowrap;
   font-size: 0.9rem;
   font-weight: 500;
   color: var(--muted);
@@ -486,4 +487,48 @@ code,
 .footer {
   text-align: center;
   margin-top: 8px;
+}
+
+/* Tablet and phone: one column, wrapped hero stats, full-width wallet controls. */
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .hero-stats {
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 24px;
+  }
+  .hero-range {
+    grid-column: 1 / -1;
+  }
+  .stats-4 {
+    grid-template-columns: 1fr 1fr;
+  }
+  .wallet,
+  .wallet-info {
+    width: 100%;
+    align-items: flex-start;
+  }
+  .wallet .select {
+    flex: 1 1 200px;
+  }
+  .chart .axis {
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 420px) {
+  .big {
+    font-size: 1.6rem;
+  }
+  .card {
+    padding: 14px;
+  }
+  .input-row {
+    flex-wrap: wrap;
+  }
+  .input-row .btn {
+    flex: 1 1 100%;
+  }
 }

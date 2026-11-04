@@ -2,6 +2,27 @@ import { useWallet } from "../context/WalletContext.jsx";
 import { CONFIG } from "../lib/contract.js";
 import { formatEth, formatTokens, shortAddr } from "../lib/format.js";
 
+// Switch between the node's test accounts in one step (seller, then each bidder) during a demo.
+function LocalAccountSelect({ w }) {
+  const current = w.mode === "local" ? w.account : "";
+  return (
+    <select
+      className="select"
+      aria-label="Use a local test account"
+      value={current}
+      onChange={(e) => w.selectLocalAccount(e.target.value)}
+    >
+      <option value="">{current ? "Switch test account…" : "Use local test account…"}</option>
+      {w.localAccounts.map((a, i) => (
+        <option key={a} value={a}>
+          #{i} {shortAddr(a)}
+          {i === 0 ? " (deployer / seller)" : ""}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export function Header({ me }) {
   const w = useWallet();
   return (
@@ -31,6 +52,7 @@ export function Header({ me }) {
                 </span>
               )}
             </div>
+            {w.mode === "local" && <LocalAccountSelect w={w} />}
             <button className="btn btn-ghost" onClick={w.disconnect}>
               Disconnect
             </button>
@@ -42,21 +64,7 @@ export function Header({ me }) {
                 Connect MetaMask
               </button>
             )}
-            {w.localAccounts.length > 0 && (
-              <select
-                className="select"
-                aria-label="Use a local test account"
-                value=""
-                onChange={(e) => w.selectLocalAccount(e.target.value)}
-              >
-                <option value="">Use local test account…</option>
-                {w.localAccounts.map((a, i) => (
-                  <option key={a} value={a}>
-                    #{i} {shortAddr(a)}
-                  </option>
-                ))}
-              </select>
-            )}
+            {w.localAccounts.length > 0 && <LocalAccountSelect w={w} />}
           </>
         )}
       </div>
