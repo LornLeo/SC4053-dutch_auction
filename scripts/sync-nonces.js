@@ -7,7 +7,8 @@ const hre = require("hardhat");
 // A restarted node starts every account at 0 again, so MetaMask's remembered number is too high.
 // This script raises each test account's nonce on the LOCAL node to "seconds since 2026-01-01",
 // which is higher than anything sent before and keeps growing across restarts, so MetaMask
-// always uses the chain's number. Run it after deploying:
+// always uses the chain's number. It then mines one block so MetaMask's per-block RPC cache
+// is refreshed. Run it after deploying:
 //   npx hardhat run scripts/sync-nonces.js --network localhost
 const EPOCH = Date.UTC(2026, 0, 1) / 1000;
 const ACCOUNTS = 10; // test accounts #0..#9
@@ -25,7 +26,12 @@ async function main() {
     }
     console.log(`#${i} ${s.address} nonce ${current} -> ${Math.max(current, target)}`);
   }
-  console.log("Done. MetaMask will now use the chain's nonce for these accounts.");
+  // hardhat_setNonce does not mine a block, and MetaMask caches RPC answers per block number, so it
+  // kept using the nonce it had cached for the current block ("Nonce too low ... got 9").
+  // Mining one empty block makes MetaMask fetch the new nonce.
+  await hre.network.provider.send("evm_mine");
+  console.log(`Mined block ${await hre.ethers.provider.getBlockNumber()} so MetaMask refreshes its cached nonce.`);
+  console.log("Done. Reload the dApp page, then send the transaction again.");
 }
 
 main().catch((e) => {
