@@ -372,23 +372,22 @@ write TODO rather than inventing a date, a hash or a test result.
 
 > If you would rather commit after each F prompt, tag the last commit before your own review as the "first draft".
 
-## Prompt log (fill in as you go, then copy to AI_AUDIT.md §3.2)
+## Prompt log (as run on 2026-11-04)
 
-| Audit # | Prompt | Date | Tool / model | Output | Kept / changed / issues found |
-|---|---|---|---|---|---|
-| P4 | F0 spec | | | | |
-| P5 | F1 scaffold | | | | |
-| P6 | F2 wallet | | | | |
-| P7 | F3 state hook | | | | |
-| P8 | F4 bidder view | | | | |
-| P9 | F5 settlement | | | | |
-| P10 | F6 seller panel | | | | |
-| P11 | F7 tx and errors | | | | |
-| P12 | F8 design | | | | |
-| P13 | R1 review | | | | |
-| P14 | R2 maths and time | | | | |
-| P15 | R3 wallet edge cases | | | | |
-| P16 | R4 action guards | | | | |
-| P17 | R5 security | | | | |
-| P18 | R6 unit tests | | | | |
-| P19+ | R7 and R8 per issue, R9 re-review | | | | |
+The chain was run end to end by **one Claude Code session** (claude-opus-5-5, Claude desktop app with its built-in
+browser), because C asked for the whole frontend to be completed in one go. **Deviation from "How to use":** Phase 2 was
+*not* run in a fresh session, so the reviewer was the same AI that wrote the code. Objective checks (browser
+measurements against the chain, contract-parity tests, `npm audit`) were used to compensate, and an independent human
+PR review is still required. The AI_AUDIT.md §3.2 numbers are in the first column.
+
+| Audit # | Prompts | Output | Kept / changed / issues found |
+|---|---|---|---|
+| P4 | (this file) | `audit/frontend-prompts.md` | Kept |
+| P5 | F0 spec | `FRONTEND_SPEC.md` (`acd9acf`) | §11 decisions taken by the AI, C to confirm; §6 corrected (ISSUE-006, 011) |
+| P6 | F1 to F7 build | First draft (`a3f5509`), committed before it was run | ISSUE-006 to 010, 012, 013 found in it |
+| P7 | F8 design | `6b783a5` | Phone layout overlap fixed; one-click account switch |
+| P8 | R6 unit + parity tests | `74cd445` | 26 + 4 tests, all passed on the draft maths |
+| P9 | Manual E2E + R1 to R5 | `audit/frontend-e2e-notes.md` run 1 | ISSUE-006 to 010 (browser), 012 (`npm audit`), 013 (code review) |
+| P10 | R7 + R8 per issue | `aadee49`, `1fbc262`, `03c43c3`, `f7f8a08`, `e5b275a`, `e1ebb0c`, `03d7367` | One commit per issue, each with a test or a measurement |
+| P11 | R9 re-review | E2E run 2 | Found ISSUE-011 (regression from the ISSUE-006 fix), fixed in `8f279a5`; final demo passes |
+| P12 | F9 README + A1 audit entries | README, AI_AUDIT.md frontend sections | Written from recorded facts; unknowns left as TODO |

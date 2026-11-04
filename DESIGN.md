@@ -147,6 +147,9 @@ Events: `AuctionStarted`, `BidPlaced`, `AuctionCleared`, `AuctionFinalized`, `Cl
 
 ## 10. Frontend (React + ethers + MetaMask, local Hardhat node)
 
+Summary only. The full frontend spec (statuses, enable rules, chain time, formulas, acceptance tests) is
+`FRONTEND_SPEC.md`.
+
 - Connect wallet; show network, account, ETH balance
 - Status: Not started / Active / Sold out / Ended / Finalized
 - Live price and countdown (from `startTime` and chain time)

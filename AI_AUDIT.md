@@ -12,7 +12,7 @@
 
 - [ ] **A:** tick Appendix C (including section 2b, the re-review of the fixes), fill commit hashes, run Slither
 - [ ] **B:** add test-suite and Slither findings to §5 and §6, review A's PR
-- [ ] **C:** fill §2 (frontend tooling), §3 (your prompts), §8, add UI issues to §5
+- [ ] **C:** fill §2 (frontend tooling), §3 (your prompts), §8, add UI issues to §5. *Drafted on 2026-11-04 (branch `feat/frontend`); C still has to: confirm the FRONTEND_SPEC decisions (§1), test with MetaMask and add screenshots (§6.3), add a personal view to §8, and have B or A review the PR (§2.4)*
 - [ ] **Everyone:** add your own prompts to §3.2 and bugs to §5 as you go, not at the end
 - [ ] Replace every `<name>`, `<hash>` and `TODO`; remove sections that do not apply only if the brief allows it
 
@@ -39,6 +39,16 @@ clock with `start()`; refunds are pull-based so one failing recipient cannot blo
 **Features:** wallet connect, live price and countdown, bid form, claim and refund, finalize button, seller controls.
 Bonus: reentrancy attack demonstration.
 
+**Frontend scope (Role C):** `DESIGN.md` §10 was expanded into `FRONTEND_SPEC.md` before any frontend code
+was generated (commit `acd9acf`, 2026-11-04, prompt F0). It fixes the stack (React 18 + Vite 5 + ethers v6 + MetaMask), the
+six UI statuses and their exact on-chain conditions (including "Demand met", where `bid()` and `finalize()` both
+revert), the enable rule for every action, chain-time handling, the BigInt formulas, and ten acceptance criteria.
+- The spec was drafted by Claude. Its six open decisions (§11: JS, direct-RPC reads, 2 s polling, local test accounts,
+  SVG chart, committed `contracts.json`) were taken by the AI on its own recommendations, because C asked for the
+  frontend to be completed end to end. **C to confirm: TODO.**
+- Changed after review: §6 (chain time) was corrected by ISSUE-006 and ISSUE-011 (commits `aadee49`, `8f279a5`). This is a
+  documented change to the spec after code generation.
+
 ---
 
 ## 2. Development Methodology & AI Tooling Infrastructure
@@ -52,7 +62,9 @@ Bonus: reentrancy attack demonstration.
 | Claude (claude-sonnet-5-5), Claude Code session | A | Project plan, spec drafting, first contract draft, deploy/seed scripts, smoke and review tests, this document's templates |
 | Hardhat 2.x, Chai, OpenZeppelin Contracts 5.x | A, B | Compile, test, ERC20 / ERC20Burnable / ReentrancyGuard |
 | Slither | B | Static analysis. TODO: not yet run |
-| TODO (frontend tooling, any AI used by C) | C | |
+| Claude (claude-opus-5-5), Claude Code desktop app with its built-in browser | C | Frontend spec, prompt chain, first-draft frontend, review, browser E2E testing, fixes, unit and parity tests, README, these frontend sections |
+| React 18.3, Vite 5.4, ethers 6.17, Vitest 2.1 (exact versions pinned) | C | Web app, dev server and `/rpc` proxy, wallet and contract calls, unit tests |
+| Hardhat node + `hardhat-network-helpers`, `npm audit` | C | Local chain, time travel in parity tests, dependency review |
 | TODO (any AI used by B) | B | |
 
 ### 2.2 Workflow
@@ -64,10 +76,32 @@ Bonus: reentrancy attack demonstration.
 5. Someone other than the prompter wrote tests and ran static analysis.
 6. Fixes were made in separate commits that reference the issue ID, with evidence logged in §5.
 
+**Frontend (C), following the prompt chain in `audit/frontend-prompts.md`:**
+1. F0: spec (`FRONTEND_SPEC.md`) committed before any UI code (`acd9acf`).
+2. F1 to F7: the AI generated the app in one pass. It was committed untouched as "AI first draft frontend
+   (unreviewed)" (`a3f5509`) before it was even built.
+3. Manual end-to-end run in a real browser against a local node (`audit/frontend-e2e-notes.md`), then F8 design pass (`6b783a5`).
+4. R6: unit tests and contract-parity tests (`74cd445`). R1 to R5: review against the spec, the maths, wallet state,
+   action guards and security (`npm audit`).
+5. One commit per confirmed issue (ISSUE-006 to ISSUE-013), each with a test or a measured before/after.
+6. R9: re-test of every fix plus a full demo run. It found one regression (ISSUE-011), which was fixed the same way.
+
+*Limitation:* the same AI session generated, reviewed and tested the frontend. The objective checks (browser
+measurements, parity tests against the contract, `npm audit`) reduce but do not remove that bias. An independent PR
+review by A or B is still required (§2.4).
+
 ### 2.3 Custom artefacts built for the AI
 
 `SPEC.md` (requirements), `DESIGN.md` (formulas, flows, test checklist), `contracts/IDutchAuction.sol` (the interface as
 a contract between team members), this audit file. TODO: add any prompts, agents or scripts the team built.
+
+Frontend artefacts (C):
+- `FRONTEND_SPEC.md`: the spec given to the AI for UI code.
+- `audit/frontend-prompts.md`: a reusable prompt chain: F0 spec, F1 to F9 build, R1 to R9 review, test and fix, A1 audit drafting, with a commit plan.
+- `scripts/exportFrontend.js`: writes the ABI and addresses to `frontend/src/contracts.json` on every deploy, so the
+  UI can never point at a stale contract.
+- `test/FrontendParity.test.js`: runs the UI's maths module against the real contract. This is a guard against the
+  frontend and contract drifting apart.
 
 ### 2.4 Division of labour and decisions
 
@@ -75,7 +109,7 @@ a contract between team members), this audit file. TODO: add any prompts, agents
 |---|---|---|
 | A | Contracts, deployment, demo scripts | Generated contracts, scripts, tests; reviewed output |
 | B | Tests, security, validation | TODO |
-| C | Frontend, README, demo video, assembling this audit | TODO |
+| C | Frontend, README, demo video, assembling this audit | Claude generated the spec draft, the frontend, the tests and the fixes from the prompt chain. Decisions in FRONTEND_SPEC §11 are to be confirmed by C. Evidence comes from browser runs and tests, not from the AI's own claims. PR review by A or B: TODO |
 
 Review rotation: the person who did not prompt the AI reviews its output. TODO: confirm this is what happened.
 
@@ -90,6 +124,9 @@ Review rotation: the person who did not prompt the AI reviews its output. TODO: 
 `SPEC.md`, `DESIGN.md`, `contracts/IDutchAuction.sol`, and the course brief (Option 2). The generation prompt was short;
 the real instructions were in these files, so this is spec-driven generation.
 
+For the frontend: `FRONTEND_SPEC.md` plus the compiled `DutchAuction` ABI. The build prompts (F1 to F7) only point at
+sections of the spec. The full prompt text is in `audit/frontend-prompts.md`.
+
 ### 3.2 Prompt log
 
 Only the prompts that shaped the code or fixed issues are listed, as summaries. Prompts about local setup, audit
@@ -101,7 +138,16 @@ formatting and document merging are left out because they did not change the con
 | P1 | 2026-10-31 | A | Claude | Generate the contracts, deploy/seed scripts and smoke tests from the spec files | Contracts, scripts, 6 smoke tests | Baseline, then reviewed |
 | P2 | 2026-10-31 | A | Claude | Review the first draft and write tests for its weak points | ISSUE-003 and ISSUE-004 found and reproduced by tests | Kept |
 | P3 | 2026-11-03 | A | Claude | Fix ISSUE-003 and ISSUE-004 | `claimFor`, `pendingRefund` / `withdrawRefund`, regression tests | Kept. A's edits: TODO |
-| P4+ | | B / C | | TODO: add only prompts that shaped code or fixed issues | | |
+| P4 | 2026-11-04 | C | Claude Code | Write the frontend prompt chain (build, review, test, fix) | `audit/frontend-prompts.md` | Kept |
+| P5 | 2026-11-04 | C | Claude Code | F0: frontend spec from SPEC/DESIGN/contracts | `FRONTEND_SPEC.md` (`acd9acf`) | Kept; §6 corrected later (ISSUE-006/011); §11 decisions: C to confirm |
+| P6 | 2026-11-04 | C | Claude Code | F1 to F7: scaffold, ABI export, wallet, state hook, bidder and settlement views, seller panel, tx/errors | First draft (`a3f5509`) | Baseline; ISSUE-006 to 010, 012, 013 found in it |
+| P7 | 2026-11-04 | C | Claude Code | F8: design pass after viewing it at 375 px | Responsive layout, one-click account switch (`6b783a5`) | Kept |
+| P8 | 2026-11-04 | C | Claude Code | R6: unit tests + contract parity tests; a failing test is a bug, not a wrong expectation | 26 Vitest + 4 parity tests (`74cd445`) | Kept; all passed on the draft maths |
+| P9 | 2026-11-04 | C | Claude Code | Manual E2E run + R1 to R5 review (spec, maths/time, wallet state, guards, security) | Issue list ISSUE-006 to 013 | Kept |
+| P10 | 2026-11-04 | C | Claude Code | R7/R8: root cause + smallest fix + regression test, one commit per issue | `aadee49` … `03d7367` | Kept |
+| P11 | 2026-11-04 | C | Claude Code | R9: re-test every fix and the full demo | Found ISSUE-011 (regression), fixed; final run passes | Kept |
+| P12 | 2026-11-04 | C | Claude Code | A1/F9: README, E2E notes and these audit entries from the recorded facts only | README, `audit/frontend-e2e-notes.md`, this section | C to proofread |
+| P13+ | | B | | TODO: add only prompts that shaped code or fixed issues | | |
 
 ### 3.3 Prompt records
 
@@ -126,6 +172,28 @@ solvent and leave the first-draft snapshot untouched. Output: `claimFor(address)
 `withdrawRefund(to)`, rewritten regression tests, updated interface, `SPEC.md` and `DESIGN.md`. One test used a
 Hardhat time-travel method that does not exist and failed once; it was corrected before the fix was accepted.
 Outcome: kept after review by A on TODO date.
+
+**P5: frontend spec (F0).** Context: `SPEC.md`, `DESIGN.md`, both contracts, the brief. Asked for a spec that the UI
+code would be generated from, listing open decisions instead of deciding them silently. Output: `FRONTEND_SPEC.md`
+with a status table, action and revert table, formulas, chain-time rules and acceptance tests. The AI's §6 told the
+UI to "re-anchor on every refresh". That instruction was itself the root cause of ISSUE-006, so the spec, not just
+the code, carried the mistake.
+
+**P6: first draft (F1 to F7).** Context: `FRONTEND_SPEC.md`, the ABI, `deploy.js`/`seed.js`. One generation pass:
+`scripts/exportFrontend.js`, a Vite app, `WalletContext` (MetaMask plus local test accounts), `useAuction` (2 s polling,
+chain-time anchor), components, `TxContext` (toasts, custom-error decoding). Committed untouched (`a3f5509`).
+It built and deployed on the first try, and the full happy path (start, bids, sell-out, finalize, claims, withdraw,
+contract left with 0 wei) worked in the first browser run. The defects were all in time handling, state staleness
+and edge cases.
+
+**P9: review (R1 to R5) and manual test.** Context: the running app, the node's RPC, the spec. Method: drive the UI
+in a real browser with 4 to 5 accounts, compare every displayed number with the chain, and then read the code
+against the spec, wallet edge cases, action guards and `npm audit`. Output: ISSUE-006 to 010 and 012 (observed or
+measured) and ISSUE-013 (code reading only, not reproduced).
+
+**P10/P11: fixes and re-test.** For each issue: the root cause, the smallest fix, a regression test where the logic
+is testable, and a re-measurement in the browser. The re-test found that the ISSUE-006 fix had introduced ISSUE-011.
+It was fixed by anchoring on the node's `pending` block, which was first checked to follow `evm_increaseTime`.
 
 ---
 
@@ -158,6 +226,29 @@ Outcome: kept after review by A on TODO date.
 
 **Changes made after review (not part of the first draft):** `claimFor(address)`, `pendingRefund` and `withdrawRefund(to)` (ISSUE-003, ISSUE-004). See §5 and §7. The first draft remains in `audit/first-draft/` for comparison (`git diff` against the "AI first draft (unreviewed)" commit shows the change).
 
+### 4.1 Frontend (AI first draft, commit `a3f5509`)
+
+*Owner: C.* `git diff a3f5509 feat/frontend -- frontend` shows every change made after review.
+
+| Layer | File | Role in the AI's design |
+|---|---|---|
+| Config | `scripts/exportFrontend.js` → `frontend/src/contracts.json` | Chain id, deploy block, addresses, full ABIs written on every deploy |
+| Providers | `src/lib/contract.js` | Read-only `JsonRpcProvider` to the node through Vite's `/rpc` proxy (works without a wallet); write contracts bound to the signer |
+| Wallet | `src/context/WalletContext.jsx` | MetaMask (`BrowserProvider` rebuilt on `chainChanged`) or a local unlocked account (`JsonRpcSigner`); `canWrite = signer && right chain` |
+| State | `src/hooks/useAuction.js` | One snapshot of every contract view, the account's position, balances and all events, polled every 2 s and after each tx; derived values recomputed every second |
+| Maths | `src/lib/auctionMath.js` | Pure BigInt mirror of the Solidity formulas: price, maxCommit, bid estimate, status, claim preview |
+| Tx | `src/context/TxContext.jsx`, `src/lib/errors.js` | `run(key, label, send)` → wallet → pending → confirmed / failed / cancelled; per-button busy keys; custom errors decoded with the ABI |
+| UI | `src/components/*` | Header, PriceHero (SVG chart), ProgressCard, BidForm, MyPosition, SettlementCard, ResultsCard, SellerPanel, ActivityFeed, Toasts |
+
+**AI choices beyond the spec:** a test-account signer so the demo works without MetaMask; reading through the node
+instead of the wallet provider; parsing raw logs with the ABI for the activity feed; a "Settle all bidders" keeper
+button built on `BidPlaced` events (the UI side of ISSUE-003).
+
+**Weak points, found later:** time was modelled as "latest block + local seconds" with the anchor reset on every poll
+(ISSUE-006/011). Derived values did not distinguish "bidding open" from "bidding over" (ISSUE-008). One-off lookups
+were never refreshed (ISSUE-009, 013). The default ethers polling (ISSUE-007) and the dependency versions (ISSUE-012)
+were accepted without being questioned.
+
 ---
 
 ## 5. Problems Discovered & Vulnerability Analysis
@@ -173,7 +264,15 @@ Outcome: kept after review by A on TODO date.
 | ISSUE-003 | Unclaimed bids lock proceeds and tokens | Medium | Logic / availability | AI review of its own draft, reproduced by test | Fixed |
 | ISSUE-004 | A bidder that cannot receive ETH cannot claim tokens | Low | Logic / refund handling | AI review of its own draft, reproduced by test | Fixed |
 | ISSUE-005 | Setup instructions targeted the wrong Hardhat version | Low | Toolchain | Manual setup | Fixed |
-| ISSUE-006+ | TODO (B, C): add from tests, Slither, UI testing | | | | |
+| ISSUE-006 | Countdown and price froze between blocks | Medium | Frontend / chain time | Browser E2E | Fixed |
+| ISSUE-007 | Transaction toast lagged ~4 s behind the chain | Low | Frontend / provider config | Browser E2E, measured | Fixed |
+| ISSUE-008 | Price, clock and demand figures kept moving after bidding closed | Medium | Frontend / wrong displayed price | Browser E2E | Fixed |
+| ISSUE-009 | Settlement controls acted on stale state | Low | Frontend / stale state | Browser E2E (revert seen) | Fixed |
+| ISSUE-010 | Stopped node showed a raw "server response 500" | Low | Frontend / error handling | Browser E2E | Fixed |
+| ISSUE-011 | Chain clock lagged after page load (regression from the ISSUE-006 fix) | Medium | Frontend / chain time | R9 re-test | Fixed |
+| ISSUE-012 | Pinned dependencies with known advisories | Medium (High for `ws`, dev-only for the rest) | Frontend / supply chain | `npm audit` (R5) | Fixed (runtime); dev-only residual accepted |
+| ISSUE-013 | Slow refresh for the previous account could overwrite the new one | Low | Frontend / race condition | Code review (R3), not reproduced | Fixed |
+| ISSUE-014+ | TODO (B): add from tests and Slither | | | | |
 
 ### 5.2 Issue breakdowns (brief §2.2 format)
 
@@ -229,6 +328,86 @@ Outcome: kept after review by A on TODO date.
 - **4. Evidence the fix works:** `npx hardhat test` passes (`audit/test-output.txt`).
 - **Commit:** TODO `<hash>` ("Switch scaffold to Hardhat 2")
 
+#### ISSUE-006: Countdown and price froze between blocks
+- **Found by / date / how:** C (Claude Code session), 2026-11-04, first browser run of the draft (`audit/frontend-e2e-notes.md`, run 1)
+- **Severity / location:** Medium (misleading price and wrong bid estimate, no loss of funds); `frontend/src/hooks/useAuction.js`; also `FRONTEND_SPEC.md` §6
+- **What the AI generated:** `anchor.current = { chainTs: BigInt(block.timestamp), localMs: Date.now() }` on every 2 s poll, with `now = chainTs + (Date.now() - localMs)/1000`. The spec it wrote said "re-anchored on every refresh".
+- **1. Why the AI made the mistake:** it correctly avoided `Date.now()` as the auction clock, but assumed the latest block keeps up with time. A Hardhat node only mines when a transaction arrives, so polling returns the same block and every poll reset the elapsed time to zero. The mistake started in the spec and was copied faithfully into the code, like ISSUE-003.
+- **2. Why it is problematic:** the UI showed 20:00 and 1.0000 ETH 26 s after `start()`. Bid estimates used a price that was too high: the form said 372 ETH accepted / 228 refunded, and the real bid had 345.75 ETH accepted / 254.25 refunded. Users would bid on false information.
+- **3. How it was fixed:** `src/lib/chainClock.js`. The anchor moves only when a *new* block appears, so time keeps running between blocks. The spec's §6 was corrected. (This fix was later replaced, see ISSUE-011.)
+- **4. Evidence the fix works:** regression test `chain clock … keeps advancing across polls that return the same latest block`. In the browser, with block number fixed at 2 for 12 s, the UI went 19:59 / 0.9992 → 19:46 / 0.9895.
+- **Commit:** `aadee49`
+
+#### ISSUE-007: Transaction toast lagged ~4 s behind the chain
+- **Found by / date / how:** C, 2026-11-04, browser E2E; measured with an in-page timer
+- **Severity / location:** Low (UX); `frontend/src/lib/contract.js`, `WalletContext.jsx`
+- **What the AI generated:** providers created with ethers v6 defaults (`pollingInterval` 4000 ms), so `tx.wait()` checked for receipts only every 4 s.
+- **1. Why the AI made the mistake:** library defaults tuned for public chains (12 s blocks) were accepted unchanged for an instant-mining local node.
+- **2. Why it is problematic:** the page already showed the new bid while the toast still said "Pending…" and the button stayed disabled. That invites double submits and makes the demo look broken.
+- **3. How it was fixed:** `pollingInterval = 1000` on the read provider and the MetaMask `BrowserProvider`.
+- **4. Evidence the fix works:** same 10 ETH bid, same harness: click → "Confirmed" 4406 ms before, 415 ms after.
+- **Commit:** `1fbc262`
+
+#### ISSUE-008: Price, clock and demand figures kept moving after bidding closed
+- **Found by / date / how:** C, 2026-11-04, browser E2E (sell-out, lazy-clear and no-sell-out scenarios)
+- **Severity / location:** Medium (wrong price shown); `PriceHero.jsx`, `BidPanel.jsx`, `useAuction.js`, `auctionMath.js`
+- **What the AI generated:** the hero always showed `priceAt(now)` and `timeLeft(now)`, and the Demand card used that price, for every status except Finalized.
+- **1. Why the AI made the mistake:** it modelled the price as a pure function of time and did not encode that once bidding closes the relevant number is the clearing price, which is fixed (sold out) or already determined (`max(reserve, ceil(committed/supply))`). The spec's status table had the information, but the AI did not connect it to what the screen should display.
+- **2. Why it is problematic:** after a sell-out the "current price" kept falling and a countdown kept running. After finalize "sells out at" kept changing. In the lazy-clear case the Ended screen headlined **0.1000 ETH** and `finalize()` then cleared at **0.5000 ETH**. Users and the demo audience see a wrong price.
+- **3. How it was fixed:** `expectedClearingPrice()` (the exact formula `finalize()` uses) and `displayPrice()`. Status-specific labels: Clearing price / Expected clearing price / "Finalize opens in" / "Bidding: Closed". The chart marker is hidden once bidding is over. An exact-fill bid no longer says "0.0000 ETH is refunded".
+- **4. Evidence the fix works:** unit tests (`expectedClearingPrice / displayPrice (ISSUE-008)`). Parity test: `expectedClearingPrice()` before finalize equals `clearingPrice()` after, for 500 ETH, 50 ETH and 1,234,567 wei. Browser: Sold out shows "Clearing price 0.8665 · Bidding Closed".
+- **Commit:** `03c43c3`
+
+#### ISSUE-009: Settlement controls acted on stale state
+- **Found by / date / how:** C, 2026-11-04, browser E2E: a second Settle click reverted
+- **Severity / location:** Low; `Settlement.jsx` (`SettlementCard`), `SellerPanel.jsx`
+- **What the AI generated:** `lookup()` checked `bids`/`excess` once per keystroke and never again. It had no `catch` and no protection against out-of-order answers. "Settle all" was only busy during each transaction, not while it read balances.
+- **1. Why the AI made the mistake:** one-off reads were treated as facts, without considering that the UI's own transaction changes them.
+- **2. Why it is problematic:** after settling Alice the Settle button stayed enabled. A second click sent a transaction that reverted (`NothingToClaim`, shown as "Nothing to claim for this address."), wasting gas on a real chain. A failed lookup became an unhandled promise rejection.
+- **3. How it was fixed:** the check is an effect keyed on the address and the block number, with a stale flag and a `catch`. The button needs a confirmed `owed` result. "Settle all" holds a busy flag for the whole loop and counts only confirmed settlements.
+- **4. Evidence the fix works:** browser: Settle enabled before, then disabled with "Nothing left to settle for 0x7099…79C8" after. The final demo run: settle-all "1 of 1", contract 0 wei.
+- **Commit:** `f7f8a08`
+
+#### ISSUE-010: Stopped node showed a raw "server response 500"
+- **Found by / date / how:** C, 2026-11-04, stopped the node during the E2E run
+- **Severity / location:** Low; `useAuction.js`, `lib/errors.js`
+- **What the AI generated:** `e?.code === "NETWORK_ERROR" || e?.code === "ECONNREFUSED" ? "no-node" : e.message`
+- **1. Why the AI made the mistake:** it reasoned about a direct connection, but its own design routes reads through the Vite `/rpc` proxy. The proxy turns a refused connection into HTTP 500, which ethers reports as `SERVER_ERROR`.
+- **2. Why it is problematic:** the main troubleshooting case (node not running) showed a meaningless error instead of "start the node".
+- **3. How it was fixed:** `isNodeUnreachable()` recognises NETWORK_ERROR, TIMEOUT, SERVER_ERROR and fetch failures, but not contract errors.
+- **4. Evidence the fix works:** unit test using the exact error seen. With the node stopped, the browser shows "Cannot reach the local Hardhat node. Start it with npx hardhat node."
+- **Commit:** `e5b275a`
+
+#### ISSUE-011: Chain clock lagged after a page load (regression from the ISSUE-006 fix)
+- **Found by / date / how:** C, 2026-11-04, R9 re-test of the fixes (crossing bid after a page reload)
+- **Severity / location:** Medium; `lib/chainClock.js`, `useAuction.js`
+- **What the AI generated (in its own fix):** anchoring the latest block at the moment the page first saw it.
+- **1. Why the AI made the mistake:** the ISSUE-006 fix assumed the latest block was mined just before the page saw it. After a reload the latest block can be minutes old, so the clock started that far behind. The fix was tested only in the scenario that exposed the original bug.
+- **2. Why it is problematic:** the estimate said 920.75 ETH accepted at 0.9407 and the bid executed at 0.8665 with 846.5 ETH accepted, about 99 s of price decay off.
+- **3. How it was fixed:** anchor on the node's **pending block** timestamp, which is the timestamp the next transaction will get. It was checked first that it follows wall time *and* `evm_increaseTime` (+100 s moved it from …600 to …700). The latest-block logic remains as a fallback.
+- **4. Evidence the fix works:** tests `chain clock: pending block (ISSUE-011)`. Browser: reload on a 40 s old block, estimate 656.50 at 0.9565 vs actual 655.75 at 0.9557 (about 1 s). Final demo: 436.50 vs 435.75.
+- **Commit:** `8f279a5`
+
+#### ISSUE-012: Pinned frontend dependencies had known advisories
+- **Found by / date / how:** C, 2026-11-04, `npm audit` in the R5 security review
+- **Severity / location:** Medium overall: `ws` (via ethers, shipped to users) high; vite/esbuild/vitest dev-only; `frontend/package.json`
+- **What the AI generated:** exact pins `ethers 6.13.4`, `vite 5.4.11`, `vitest 2.1.9`, chosen as "well-known, older" versions.
+- **1. Why the AI made the mistake:** it applied the ISSUE-005 lesson (pin versions) but chose versions from memory without checking advisories.
+- **2. Why it is problematic:** 7 findings (2 critical, 2 high, 3 moderate). `ws` < 8.20 can disclose memory and be DoS'd. The Vite dev server could be read by any website open in the same browser.
+- **3. How it was fixed:** upgraded within the same majors: ethers 6.17.0 (released 2026-06-18) and vite 5.4.21. The remaining 6 findings need vitest 5 / vite 8 (vitest 5.1.0 was 2 days old and needs Vite 6+). They affect only the local dev server and test runner, not the built app. **Accepted residual risk:** do not expose the dev server to a network (Vite binds to localhost by default) and do not run the Vitest UI. Revisit after the course.
+- **4. Evidence the fix works:** `npm audit` 7 → 6 findings with none in runtime dependencies. Build and 37 tests pass.
+- **Commit:** `03d7367`
+
+#### ISSUE-013: A slow refresh for the previous account could overwrite the new one
+- **Found by / date / how:** C, 2026-11-04, code review (R3, wallet state). **Not reproduced** in the browser; fixed defensively.
+- **Severity / location:** Low; `useAuction.js`
+- **What the AI generated:** `refresh()` closed over `account` and always wrote its result, even if the user had switched accounts while it was in flight.
+- **1. Why the AI made the mistake:** a common React pattern (async fetch in a callback) without a cancellation or ownership check.
+- **2. Why it is problematic:** for up to one poll the page could show the previous account's position and ETH balance. The bid form uses that balance for its "more ETH than this account holds" check.
+- **3. How it was fixed:** a result is dropped if it was fetched for an account that is no longer connected. A "newest request only" rule was rejected because it could starve updates when a refresh is slower than the poll interval.
+- **4. Evidence the fix works:** code reading and the full demo run, with account switches between every step showing the right position each time. No automated test (it would need a React test renderer; TODO if time allows).
+- **Commit:** `e1ebb0c`
+
 ### 5.3 Template for a new issue (copy and fill)
 
 #### ISSUE-00X: <short title>
@@ -248,6 +427,16 @@ State only what a person verified. From A's review: reentrancy in `claim` and `w
 call; overflow is not possible at demo values; accounting uses tracked variables, not `address(this).balance`.
 TODO (A): keep only what you confirmed in Appendix C.
 
+Frontend checks with no finding (C, 2026-11-04, from tests and browser runs, not just reading):
+- **UI maths = contract maths.** All 26 draft unit tests and 4 parity tests passed before any fix. The claim preview equalled the
+  on-chain claim to the wei (385989394362266257326 units, 254.25 ETH + 1 wei dust), and `bidEstimate()` at the mining
+  timestamp predicts `BidPlaced` exactly.
+- **No floats for wei.** `Number()` is used only for chart coordinates and the countdown. All amounts are `BigInt`, with `parseEther`/`formatUnits` for input and display.
+- **Seller-only controls** are hidden for non-sellers (address compared case-insensitively). The contract still enforces `NotSeller`.
+- **Custom errors** are decoded and shown in plain English (`NothingToClaim` seen live). Wallet rejection is classified as "cancelled" (unit tested; MetaMask not yet tried).
+- **Security scan** of `src/`: no private keys, mnemonics or `dangerouslySetInnerHTML`. `contracts.json` holds only addresses and ABIs. `.gitignore` excludes `frontend/node_modules` and `frontend/dist`.
+- **Edge cases that behaved correctly:** never-sold-out burn (500 burned, supply 500), lazy clear (Demand met → finalize at 0.5), no contract after `hardhat_reset` (banner), final contract balance 0 wei.
+
 ---
 
 ## 6. Validation Process & Testing Strategy
@@ -261,6 +450,8 @@ TODO (A): keep only what you confirmed in Appendix C.
 | `test/DutchAuction.smoke.test.js` (6) | A | Price decay, crossing bid and refund, never-sold-out burn, lazy clear, reentrancy | Pass |
 | `test/PartA.review.test.js` (8) | A | Regression tests for the ISSUE-003 and ISSUE-004 fixes, including a solvency check | Pass |
 | TODO: B's suite against `DESIGN.md` §11 (price boundaries, timing, rounding, double claim, fuzz/invariants) | B | | |
+| `test/FrontendParity.test.js` (5) | C | The UI maths module against the deployed contract: price and countdown at exact timestamps, crossing-bid estimate = `BidPlaced`, claim preview = `tokensFor`/`refundFor`, expected clearing = `clearingPrice`, Demand met reverts | Pass |
+| `frontend`: `npm test` (Vitest, 37) | C | `auctionMath` (price, supply, bid estimate, status, clearing, claim preview), `chainClock` (ISSUE-006/011), formatting, error decoding, node-down detection (ISSUE-010) | Pass |
 
 Command: `npx hardhat test`. Current output (14 passing): `audit/test-output.txt`. Output from before the fixes (8 passing, with tests that documented the problems): `audit/test-output-before-fix.txt`.
 
@@ -269,13 +460,20 @@ Command: `npx hardhat test`. Current output (14 passing): `audit/test-output.txt
 | Date | Command | Findings before | Findings after | Notes |
 |---|---|---|---|---|
 | TODO | `slither .` (save to `audit/slither-before.txt` / `slither-after.txt`) | | | |
+| 2026-11-04 | `cd frontend; npm audit` (C) | 7 (2 critical, 2 high, 3 moderate) | 6, none in runtime dependencies | ISSUE-012; remaining are dev/test tooling only and need major upgrades |
 
 Not yet run. Log each finding in §5 as fixed, accepted, or a false positive with the reason.
 
 ### 6.3 Manual review and simulation
 
 - Contract review: Appendix C, reviewed by A. PR review by TODO (B).
-- Local simulation: `npx hardhat node` plus `scripts/seed.js`, then finalize and claim from the console or UI. TODO (C): UI testing notes and screenshots in `audit/screenshots/`.
+- Local simulation: `npx hardhat node` plus `scripts/seed.js`, then finalize and claim from the console or UI.
+- **Frontend E2E (C):** `audit/frontend-e2e-notes.md`. Two full runs in a real browser against a local node: the
+  untouched draft (which found ISSUE-006 to 010) and the fixed build (re-test of every fix, ISSUE-011 found and fixed,
+  then a full demo ending with 0 wei in the contract). Scenarios: sell-out with a crossing bid, lazy clear
+  (Demand met), never sold out (burn), missing contract, node stopped, 375 px phone layout.
+  Signing used the node's local test accounts. **TODO (C): repeat with MetaMask (connect, wrong network, account switch,
+  reject a signature) and save screenshots to `audit/screenshots/`.**
 
 ---
 
@@ -291,7 +489,14 @@ Not yet run. Log each finding in §5 as fixed, accepted, or a false positive wit
 | Added `claimFor(address)` so anyone can settle a bidder (ISSUE-003) | Stop non-claiming bidders from locking the seller's proceeds | 3 regression tests, `audit/test-output.txt`, commit TODO |
 | Failed refunds are deferred to `pendingRefund` and withdrawn with `withdrawRefund(to)` (ISSUE-004) | An undeliverable refund no longer blocks the tokens | 5 regression tests, commit TODO |
 | Updated `SPEC.md`, `DESIGN.md` and the interface to match the fixes | Keep spec and code in step | Appendix A, B, commit TODO |
-| TODO: gas optimisations, extra checks, UX improvements | | |
+| Frontend spec written before UI code, corrected after review (ISSUE-006/011) | Spec-driven generation for the UI too | `FRONTEND_SPEC.md`, `acd9acf`, `aadee49`, `8f279a5` |
+| `exportFrontend.js` writes ABI and addresses on every deploy | The UI can never call a stale address or ABI | `contracts.json` unchanged after a fresh redeploy |
+| Chain clock from the node's pending block (ISSUE-006, 011) | Price and estimates match the block a bid lands in | Estimate within 1 s of the actual bid |
+| Status-aware price display (ISSUE-008) | Show the clearing price once bidding is over | Parity test, browser |
+| Responsive layout and one-click test-account switching (F8) | Usable on a phone; faster demo | No horizontal scroll at 375 px, `6b783a5` |
+| Faster receipt polling, settlement re-checks, node-down banner, account-switch guard (ISSUE-007, 009, 010, 013) | Feedback that matches the chain | Measurements and tests in §5 |
+| Unit tests plus a frontend/contract parity suite | Catch drift between UI maths and Solidity | 37 + 5 tests, `audit/frontend-test-output.txt` |
+| Dependency upgrade (ISSUE-012) | Remove known-vulnerable runtime packages | `npm audit` 7 → 6, runtime clean |
 
 ---
 
@@ -300,7 +505,19 @@ Not yet run. Log each finding in §5 as fixed, accepted, or a false positive wit
 - **Where AI excelled:** a spec-conforming contract that compiled on the first attempt, consistent checks-effects-interactions and `nonReentrant`, explicit rounding handling, a working attacker contract.
 - **Where AI failed:** tests that ignored time passing, an arithmetic slip in demo data, accepting a spec gap without questioning it, safe-default error handling that blocked tokens, unpinned and OS-blind setup instructions.
 - **Recommendations for future AI-driven dApp work:** pin versions in every instruction; ask for the OS and tool versions first; ask the AI for adversarial tests (non-claiming and contract bidders) before happy paths; review the spec for "what if a user never acts?"; keep the AI's first draft untouched in version control; never let the AI grade its own work, so a different person runs tests and static analysis.
-- TODO (A, B, C): add your own observations.
+- **Frontend (C):**
+  - *Where AI excelled:* a working dApp on the first generation (the whole happy path, down to a 0-wei contract
+    balance). BigInt maths that matched the contract to the wei. Thoughtful extras (local test-account signer, keeper button).
+  - *Where AI failed:* time and state, not maths. The clock froze between blocks (ISSUE-006), and the AI's own fix
+    introduced a new lag (ISSUE-011). Values stayed live after they should have been fixed (ISSUE-008). One-off reads
+    went stale (ISSUE-009, 013). Library defaults and version pins were not questioned (ISSUE-007, 012). Two of these mistakes
+    were first written into the AI's *spec* (§6) and then implemented faithfully, the same pattern as ISSUE-003.
+  - *Recommendations:* commit the untouched draft before running it. Test in a real browser against a real node and
+    compare every number on screen with the chain; browser runs found 6 of the 8 frontend issues, while unit tests found none. Write parity tests
+    that run UI maths against the contract. Re-test fixes in a *different* scenario from the one that exposed the bug (that
+    is how ISSUE-011 was caught). Run `npm audit` on AI-chosen versions. Have a different person review, because here the
+    same AI session wrote, reviewed and fixed the frontend.
+- TODO (A, B, C): add your own observations. *(C: add a personal view on the above in your own words.)*
 
 ---
 
@@ -640,6 +857,11 @@ I reviewed the contracts on the date above and confirmed the rows I ticked. <you
 | Test output after the fixes | `audit/test-output.txt` |
 | Test output before the fixes | `audit/test-output-before-fix.txt` |
 | Slither output | `audit/slither-before.txt`, `audit/slither-after.txt` (TODO) |
-| Screenshots | `audit/screenshots/` |
+| Screenshots | `audit/screenshots/` (TODO (C): MetaMask run) |
+| Frontend spec and prompt chain | `FRONTEND_SPEC.md`, `audit/frontend-prompts.md` |
+| Untouched AI first-draft frontend | commit `a3f5509` ("AI first draft frontend (unreviewed)") |
+| Frontend E2E notes (both runs, measurements) | `audit/frontend-e2e-notes.md` |
+| Frontend unit + parity test output | `audit/frontend-test-output.txt` |
+| Frontend fix commits | `aadee49`, `1fbc262`, `03c43c3`, `f7f8a08`, `e5b275a`, `8f279a5`, `03d7367`, `e1ebb0c` (branch `feat/frontend`) |
 | Git history | `git log --oneline` (referenced hashes above) |
 

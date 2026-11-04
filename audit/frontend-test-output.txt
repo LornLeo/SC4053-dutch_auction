@@ -1,5 +1,5 @@
-# Frontend test evidence (R6). Regenerate: cd frontend; npm test   and   npx hardhat test test/FrontendParity.test.js
-# Run: 2026-11-04T04:57Z on commit 6b783a5 + R6 tests
+# Frontend test evidence. Regenerate: (cd frontend; npm test) and npx hardhat test
+# Run: 2026-11-04T05:11Z on commit 03d7367 (after fixes ISSUE-006..013)
 
 ## frontend: npm test (Vitest)
 
@@ -20,10 +20,21 @@
  ✓ src/lib/auctionMath.test.js > bidEstimate (crossing bid, DESIGN.md §6 step 6) > treats an exact fill as the sell-out bid (contract uses >=) with nothing refundable
  ✓ src/lib/auctionMath.test.js > deriveStatus (FRONTEND_SPEC.md §4) > covers every status in priority order
  ✓ src/lib/auctionMath.test.js > deriveStatus (FRONTEND_SPEC.md §4) > only Sold out and Ended allow finalize()
+ ✓ src/lib/auctionMath.test.js > expectedClearingPrice / displayPrice (ISSUE-008) > uses the crossing price once sold out
+ ✓ src/lib/auctionMath.test.js > expectedClearingPrice / displayPrice (ISSUE-008) > rounds the implied price up after a lazy clear (500 ETH for 1000 tokens -> 0.5)
+ ✓ src/lib/auctionMath.test.js > expectedClearingPrice / displayPrice (ISSUE-008) > falls back to the reserve when the auction never sold out
+ ✓ src/lib/auctionMath.test.js > expectedClearingPrice / displayPrice (ISSUE-008) > shows the live price while bidding is open
  ✓ src/lib/auctionMath.test.js > timeLeft > is the full duration before start and zero after the end
  ✓ src/lib/auctionMath.test.js > claimPreview = tokensFor / refundFor (DESIGN.md §7) > matches the recorded on-chain claim from the manual E2E run
  ✓ src/lib/auctionMath.test.js > claimPreview = tokensFor / refundFor (DESIGN.md §7) > conserves wei: cost + refund == bids + excess
  ✓ src/lib/auctionMath.test.js > claimPreview = tokensFor / refundFor (DESIGN.md §7) > is zero before a clearing price exists
+ ✓ src/lib/chainClock.test.js > chain clock: latest-block fallback (ISSUE-006) > keeps advancing across polls that return the same latest block
+ ✓ src/lib/chainClock.test.js > chain clock: latest-block fallback (ISSUE-006) > re-anchors when a new block appears, including a jump from evm_increaseTime
+ ✓ src/lib/chainClock.test.js > chain clock: pending block (ISSUE-011) > uses the node's pending timestamp, not the age of the latest block
+ ✓ src/lib/chainClock.test.js > chain clock: pending block (ISSUE-011) > follows evm_increaseTime without a new block
+ ✓ src/lib/chainClock.test.js > chainNow > never runs backwards if the local clock does, and is 0 before the first poll
+ ✓ src/lib/format.test.js > isNodeUnreachable (ISSUE-010) > treats the proxy's 500 for a stopped node as unreachable
+ ✓ src/lib/format.test.js > isNodeUnreachable (ISSUE-010) > does not hide contract or call errors
  ✓ src/lib/format.test.js > format > truncates (never rounds up) and groups thousands
  ✓ src/lib/format.test.js > format > formats countdowns as mm:ss
  ✓ src/lib/format.test.js > format > shortens addresses
@@ -32,21 +43,42 @@
  ✓ src/lib/format.test.js > decodeError > finds nested revert data and maps it to a plain-English message
  ✓ src/lib/format.test.js > decodeError > falls back to the short message
 
- Test Files  2 passed (2)
-      Tests  26 passed (26)
-   Start at  12:57:49
-   Duration  1.35s (transform 57ms, setup 0ms, collect 366ms, tests 10ms, environment 0ms, prepare 691ms)
+ Test Files  3 passed (3)
+      Tests  37 passed (37)
+   Start at  13:11:22
+   Duration  1.72s (transform 71ms, setup 0ms, collect 522ms, tests 14ms, environment 1ms, prepare 1.25s)
 
 
-## root: npx hardhat test test/FrontendParity.test.js
+## root: npx hardhat test (contracts + frontend parity)
 
+
+  DutchAuction (smoke)
+    ✔ rejects bids before start and non-seller start (511ms)
+    ✔ price decays linearly and floors at reserve
+    ✔ crossing bid: partial fill, uniform price, refund, burn, proceeds
+    ✔ never sells out: reserve price, unsold tokens burned
+    ✔ lazy clear: demand meets supply between bids
+    ✔ reentrancy attacker cannot claim twice
 
   Frontend maths parity with DutchAuction
-    ✔ priceAt() equals currentPrice() at every sampled block timestamp (543ms)
-    ✔ bidEstimate() at the mining timestamp predicts BidPlaced exactly for a crossing bid (60ms)
+    ✔ priceAt() equals currentPrice() at every sampled block timestamp (41ms)
+    ✔ bidEstimate() at the mining timestamp predicts BidPlaced exactly for a crossing bid (42ms)
     ✔ claimPreview() equals tokensFor()/refundFor() for every bidder after finalize
-    ✔ 'Demand met' status matches the contract: bid() and finalize() both revert (48ms)
+    ✔ expectedClearingPrice() before finalize equals clearingPrice() after (lazy clear and no sell-out) (71ms)
+    ✔ 'Demand met' status matches the contract: bid() and finalize() both revert (42ms)
+
+  ISSUE-003 fix: claimFor lets anyone settle a bidder who never claims
+    ✔ a third party can settle bob; the seller then receives everything and the contract is empty (40ms)
+    ✔ claimFor cannot settle the same bidder twice, nor before finalize
+    ✔ claimFor for an address with no bid reverts
+
+  ISSUE-004 fix: an undeliverable refund no longer blocks the tokens
+    ✔ claim succeeds: tokens are delivered and the refund is held as pendingRefund
+    ✔ the contract bidder can recover its refund by sending it to another address
+    ✔ a third party settling a contract bidder does not revert (no griefing of the keeper)
+    ✔ withdrawRefund rejects the zero address and callers with nothing pending
+    ✔ solvency: after everyone is settled and funds withdrawn the contract holds 0 ETH
 
 
-  4 passing (683ms)
+  19 passing (947ms)
 
