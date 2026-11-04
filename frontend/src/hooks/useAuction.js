@@ -29,17 +29,25 @@ async function pendingTimestamp() {
  * Everything the UI needs about the auction and the connected account (FRONTEND_SPEC.md §4, §6, §7).
  * State model: one snapshot of on-chain values, refreshed every 2 s and after each transaction; derived
  * values (price, status, countdown) are recomputed every second from chain time, anchored on the
- * latest block's timestamp, never from the browser clock alone.
+ * node's pending-block timestamp (lib/chainClock.js), never from the browser clock alone.
+ * A slow answer for a previously connected account is discarded instead of overwriting the
+ * current account's position (ISSUE-013).
  */
 export function useAuction(account) {
   const [snapshot, setSnapshot] = useState(null);
   const [error, setError] = useState(null);
   const [, setTick] = useState(0);
   const anchor = useRef(null); // { source, blockNumber, chainTs: BigInt, localMs } — see lib/chainClock.js
+  const accountRef = useRef(account);
+  accountRef.current = account;
 
   const refresh = useCallback(async () => {
+    // Drop answers fetched for an account that is no longer connected (no starvation if a
+    // refresh is slower than the poll interval, unlike a "newest request only" rule).
+    const current = () => accountRef.current === account;
     try {
       const code = await readProvider.getCode(CONFIG.auction.address);
+      if (!current()) return;
       if (code === "0x") {
         setError("not-deployed");
         setSnapshot(null);
@@ -109,6 +117,7 @@ export function useAuction(account) {
         .filter(Boolean)
         .reverse();
 
+      if (!current()) return;
       anchor.current = nextAnchor(anchor.current, block, pendingTs, Date.now());
       setSnapshot({
         view: {
@@ -133,6 +142,7 @@ export function useAuction(account) {
       });
       setError(null);
     } catch (e) {
+      if (!current()) return;
       setError(isNodeUnreachable(e) ? "no-node" : e?.shortMessage || e?.message);
     }
   }, [account]);
