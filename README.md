@@ -63,6 +63,11 @@ npx hardhat node
 ```bash
 npx hardhat run scripts/deploy.js --network localhost
 ```
+**Using MetaMask?** Use this instead. It deploys and then runs `scripts/sync-nonces.js`, which prevents MetaMask's
+"Nonce too high" error after a node restart (see Troubleshooting):
+```bash
+npm run deploy:local
+```
 Or deploy, start and place three demo bids in one go (the last one sells out the auction):
 ```bash
 npx hardhat run scripts/seed.js --network localhost
@@ -118,7 +123,7 @@ The UI follows chain time (the node's pending-block timestamp), so it jumps forw
 |---|---|
 | "Cannot reach the local Hardhat node" | Start `npx hardhat node` (terminal 1) |
 | "No contract at 0x… on this chain" | The node was restarted: run the deploy script again |
-| MetaMask "nonce too high" / stuck transactions after a node restart | MetaMask → Settings → Advanced → **Clear activity tab data** for each imported account |
+| MetaMask "Nonce too high. Expected nonce to be X but got Y" after a node restart | Run `npm run sync-nonces` (or deploy with `npm run deploy:local`). A restarted node resets every account's nonce to 0, but MetaMask remembers the old count and uses whichever number is higher. The script raises the test accounts' nonces on the **local node only** above anything MetaMask remembers. Clearing MetaMask's activity data alone often isn't enough, because some versions keep the nonce in memory until the extension restarts |
 | Banner "MetaMask is on chain …" | Click **Switch to Hardhat Local** |
 | Old addresses after redeploying | `contracts.json` is rewritten by the deploy script; the dev server reloads it. A fresh node always deploys to `0x5FbDB2315678afecb367f032d93F642f64180aa3` |
 | Hardhat errors about Hardhat 3 / `forge-std` / `ts-node` | This project uses **Hardhat 2** (see ISSUE-005 in `AI_AUDIT.md`); run `npm install` in the repo root, not `npx hardhat init` |

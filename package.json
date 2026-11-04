@@ -5,7 +5,9 @@
   "scripts": {
     "test": "hardhat test",
     "compile": "hardhat compile",
-    "node": "hardhat node"
+    "node": "hardhat node",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost && hardhat run scripts/sync-nonces.js --network localhost",
+    "sync-nonces": "hardhat run scripts/sync-nonces.js --network localhost"
   },
   "license": "ISC",
   "devDependencies": {

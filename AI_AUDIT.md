@@ -272,7 +272,8 @@ were accepted without being questioned.
 | ISSUE-011 | Chain clock lagged after page load (regression from the ISSUE-006 fix) | Medium | Frontend / chain time | R9 re-test | Fixed |
 | ISSUE-012 | Pinned dependencies with known advisories | Medium (High for `ws`, dev-only for the rest) | Frontend / supply chain | `npm audit` (R5) | Fixed (runtime); dev-only residual accepted |
 | ISSUE-013 | Slow refresh for the previous account could overwrite the new one | Low | Frontend / race condition | Code review (R3), not reproduced | Fixed |
-| ISSUE-014+ | TODO (B): add from tests and Slither | | | | |
+| ISSUE-014 | MetaMask "Nonce too high" after every node restart; the AI's documented fix did not work | Low | Toolchain / documentation | C's MetaMask testing | Fixed (helper script) |
+| ISSUE-015+ | TODO (B): add from tests and Slither | | | | |
 
 ### 5.2 Issue breakdowns (brief §2.2 format)
 
@@ -407,6 +408,16 @@ were accepted without being questioned.
 - **3. How it was fixed:** a result is dropped if it was fetched for an account that is no longer connected. A "newest request only" rule was rejected because it could starve updates when a refresh is slower than the poll interval.
 - **4. Evidence the fix works:** code reading and the full demo run, with account switches between every step showing the right position each time. No automated test (it would need a React test renderer; TODO if time allows).
 - **Commit:** `e1ebb0c`
+
+#### ISSUE-014: MetaMask "Nonce too high" after every node restart; the AI's documented fix did not work
+- **Found by / date / how:** C, 2026-11-04, manual MetaMask testing. After restarting `npx hardhat node`, every transaction failed with *"Nonce too high. Expected nonce to be 1 but got 8"*.
+- **Severity / location:** Low (blocks local testing, no funds at risk); `README.md` troubleshooting, local workflow
+- **What the AI generated:** README advice to fix it with MetaMask → Settings → Advanced → *Clear activity tab data*.
+- **1. Why the AI made the mistake:** it repeated a widely cited fix without checking it against the current MetaMask, which in C's test kept the old nonce after the activity data was cleared. It also didn't consider that MetaMask uses `max(chain nonce, remembered nonce + 1)`, so the problem can be solved from the chain side.
+- **2. Why it is problematic:** every node restart blocked all MetaMask transactions, the documented fix didn't help, and it cost C significant testing time.
+- **3. How it was fixed:** `scripts/sync-nonces.js` (`npm run sync-nonces`; `npm run deploy:local` deploys and then syncs). On the local node only (it refuses any chain except 31337), it raises test accounts #0 to #9 to a nonce of "seconds since 2026-01-01". That is above anything MetaMask remembers and keeps growing across restarts, so MetaMask always takes the chain's value. The README troubleshooting row was rewritten.
+- **4. Evidence the fix works:** after a restart (chain nonce of #0 = 1), the script set accounts #0 to #9 to 26556462, and a test transaction from #9 was mined (status 1, nonce 0x195382f). C then completed MetaMask transactions without the error. *TODO (C): confirm this last point after your next MetaMask run, and add a screenshot of the original error.*
+- **Commit:** see `git log --grep ISSUE-014`
 
 ### 5.3 Template for a new issue (copy and fill)
 
