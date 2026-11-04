@@ -3,7 +3,7 @@ import { parseEther } from "ethers";
 import { useWallet } from "../context/WalletContext.jsx";
 import { useTx } from "../context/TxContext.jsx";
 import { writeContracts } from "../lib/contract.js";
-import { Status, bidEstimate } from "../lib/auctionMath.js";
+import { Status, bidEstimate, biddingOpen } from "../lib/auctionMath.js";
 import { formatEth, formatTokens, fullEth } from "../lib/format.js";
 
 export function ProgressCard({ a }) {
@@ -27,7 +27,7 @@ export function ProgressCard({ a }) {
           <dd>{formatEth(a.remainingEth, 2)} ETH</dd>
         </div>
         <div>
-          <dt>Tokens left at this price</dt>
+          <dt>{biddingOpen(a.status) ? "Tokens left at this price" : "Tokens unsold (burned at finalize)"}</dt>
           <dd>{formatTokens(a.tokensRemaining)} AUC</dd>
         </div>
       </dl>
@@ -106,11 +106,14 @@ export function BidForm({ a }) {
             <p>
               ≈ <strong>{formatTokens(est.tokens)} AUC</strong> at today's price of {formatEth(a.price)} ETH
             </p>
-            {est.partial && (
+            {est.partial && est.refundable > 0n && (
               <p className="note note-warn">
                 This bid sells out the auction. Only {formatEth(est.accepted)} ETH is accepted; the other{" "}
                 <span title={fullEth(est.refundable)}>{formatEth(est.refundable)} ETH</span> is refunded when you claim.
               </p>
+            )}
+            {est.partial && est.refundable === 0n && (
+              <p className="note note-warn">This bid exactly fills the supply and sells out the auction.</p>
             )}
           </div>
         )}

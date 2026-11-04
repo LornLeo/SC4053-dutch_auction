@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CONFIG, auctionIface, readAuction, readProvider, readToken } from "../lib/contract.js";
 import {
   deriveStatus,
+  displayPrice,
   maxCommitAt,
   priceAt,
   progressBps,
@@ -12,6 +13,7 @@ import {
 import { chainNow, nextAnchor } from "../lib/chainClock.js";
 
 const POLL_MS = 2000;
+
 
 /**
  * Everything the UI needs about the auction and the connected account (FRONTEND_SPEC.md §4, §6, §7).
@@ -140,9 +142,12 @@ export function useAuction(account) {
   // Time of the next block (what a transaction sent now will see), not the latest block's time.
   const now = chainNow(anchor.current, Date.now());
   const a = snapshot.view;
-  const price = priceAt(a, now);
+  const price = priceAt(a, now); // live price: what a bid sent now pays
   const status = deriveStatus(a, now);
-  const remainingEth = remainingEthAt(a, price);
+  // ISSUE-008: once bidding is over, demand figures are shown at the (expected) clearing price,
+  // and the clock stops at a sell-out instead of counting down to the unused endTime.
+  const shownPrice = displayPrice(a, now, status);
+  const remainingEth = remainingEthAt(a, shownPrice);
 
   return {
     loading: false,
@@ -151,11 +156,12 @@ export function useAuction(account) {
     ...snapshot,
     now,
     price,
+    shownPrice,
     status,
-    secondsLeft: timeLeft(a, now),
-    maxCommit: maxCommitAt(a, price),
+    secondsLeft: a.soldOut || a.finalized ? 0n : timeLeft(a, now),
+    maxCommit: maxCommitAt(a, shownPrice),
     remainingEth,
-    tokensRemaining: tokensForEth(remainingEth, price),
-    progressBps: progressBps(a, price),
+    tokensRemaining: tokensForEth(remainingEth, shownPrice),
+    progressBps: progressBps(a, shownPrice),
   };
 }

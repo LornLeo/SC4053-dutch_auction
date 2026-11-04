@@ -60,7 +60,7 @@ export function deriveStatus(a, now) {
   return Status.ACTIVE;
 }
 
-/** Seconds left until endTime (full duration before start). */
+/** Seconds left until endTime (full duration before start). Matches timeRemaining(). */
 export function timeLeft(a, now) {
   if (a.startTime === 0n) return DURATION;
   return now >= a.endTime ? 0n : a.endTime - now;
@@ -83,3 +83,24 @@ export function claimPreview(committed, excess, clearingPrice) {
 }
 
 export const canFinalize = (status) => status === Status.SOLD_OUT || status === Status.ENDED;
+
+/** True while bids can still change the outcome. */
+export const biddingOpen = (status) => status === Status.NOT_STARTED || status === Status.ACTIVE;
+
+/**
+ * Clearing price that finalize() sets (DESIGN.md §6): the crossing price if sold out, otherwise
+ * max(reservePrice, ceil(totalCommitted * 1e18 / tokenSupply)). Added for ISSUE-008.
+ */
+export function expectedClearingPrice(a) {
+  if (a.soldOut || a.finalized) return a.clearingPrice;
+  const implied = (a.totalCommitted * UNIT + a.tokenSupply - 1n) / a.tokenSupply;
+  return implied > a.reservePrice ? implied : a.reservePrice;
+}
+
+/**
+ * The price the UI headlines (ISSUE-008): the live falling price while bids are possible, and the
+ * fixed (or already-determined) clearing price once bidding is over.
+ */
+export function displayPrice(a, now, status) {
+  return biddingOpen(status) ? priceAt(a, now) : expectedClearingPrice(a);
+}

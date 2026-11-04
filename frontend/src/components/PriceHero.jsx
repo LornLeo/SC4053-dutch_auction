@@ -24,8 +24,24 @@ export function StatusBadge({ status }) {
   return <span className={`badge ${STATUS_CLASS[status]}`}>{status}</span>;
 }
 
+// ISSUE-008: what the headline price and clock mean depends on the status.
+const PRICE_LABEL = {
+  [Status.NOT_STARTED]: "Starting price",
+  [Status.ACTIVE]: "Current price",
+  [Status.DEMAND_MET]: "Expected clearing price",
+  [Status.ENDED]: "Expected clearing price",
+  [Status.SOLD_OUT]: "Clearing price",
+  [Status.FINALIZED]: "Clearing price",
+};
+const CLOCK_LABEL = {
+  [Status.NOT_STARTED]: "Duration",
+  [Status.ACTIVE]: "Time left",
+  [Status.DEMAND_MET]: "Finalize opens in",
+};
+
 export function PriceHero({ a }) {
-  const { view, price, status, secondsLeft } = a;
+  const { view, shownPrice, status, secondsLeft } = a;
+  const clockLabel = CLOCK_LABEL[status];
   return (
     <section className="card hero">
       <div className="hero-top">
@@ -34,15 +50,15 @@ export function PriceHero({ a }) {
       </div>
       <div className="hero-stats">
         <div>
-          <p className="label">{status === Status.FINALIZED ? "Clearing price" : "Current price"}</p>
-          <p className="big" title={fullEth(status === Status.FINALIZED ? view.clearingPrice : price)}>
-            {formatEth(status === Status.FINALIZED ? view.clearingPrice : price)}
+          <p className="label">{PRICE_LABEL[status]}</p>
+          <p className="big" title={fullEth(shownPrice)}>
+            {formatEth(shownPrice)}
             <span className="unit"> ETH / AUC</span>
           </p>
         </div>
         <div>
-          <p className="label">Time left</p>
-          <p className="big mono">{formatCountdown(secondsLeft)}</p>
+          <p className="label">{clockLabel ?? "Bidding"}</p>
+          <p className="big mono">{clockLabel ? formatCountdown(secondsLeft) : "Closed"}</p>
         </div>
         <div className="hero-range">
           <p className="label">Start → reserve</p>
@@ -69,9 +85,10 @@ function PriceChart({ a }) {
   const y = (p) => pad.t + ((hi - Number(p)) / (hi - lo)) * ih;
   const x = (s) => pad.l + (s / Number(DURATION)) * iw;
 
-  const started = view.startTime !== 0n;
+  // The moving "now" marker only makes sense while bids can still land (ISSUE-008).
+  const started = view.startTime !== 0n && (a.status === Status.ACTIVE || a.status === Status.DEMAND_MET);
   const elapsed = started ? Math.min(Number(DURATION), Math.max(0, Number(now - view.startTime))) : 0;
-  const clearing = view.clearingPrice;
+  const clearing = a.status === Status.ENDED || a.status === Status.DEMAND_MET ? a.shownPrice : view.clearingPrice;
 
   return (
     <svg className="chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Price decay over 20 minutes">
@@ -106,7 +123,7 @@ function PriceChart({ a }) {
         <>
           <line x1={pad.l} x2={W - pad.r} y1={y(clearing)} y2={y(clearing)} className="line-clearing" />
           <text x={W - pad.r} y={y(clearing) - 5} className="axis axis-strong" textAnchor="end">
-            clearing {formatEth(clearing, 4)}
+            {view.finalized || view.soldOut ? "clearing" : "expected clearing"} {formatEth(clearing, 4)}
           </text>
         </>
       )}

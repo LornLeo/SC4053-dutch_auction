@@ -80,6 +80,19 @@ describe("Frontend maths parity with DutchAuction", function () {
     }
   });
 
+  it("expectedClearingPrice() before finalize equals clearingPrice() after (lazy clear and no sell-out)", async function () {
+    for (const committed of [E("500"), E("50"), 1234567n]) {
+      const { auction, a } = await deploy();
+      await auction.start();
+      await auction.connect(a).bid({ value: committed });
+      await time.increaseTo((await auction.startTime()) + 1200n);
+      const v = { ...(await view(auction)), clearingPrice: await auction.clearingPrice() };
+      const expected = m.expectedClearingPrice(v);
+      await auction.finalize();
+      expect(await auction.clearingPrice()).to.equal(expected);
+    }
+  });
+
   it("'Demand met' status matches the contract: bid() and finalize() both revert", async function () {
     const { auction, a, b } = await deploy();
     await auction.start();

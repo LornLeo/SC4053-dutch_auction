@@ -8,6 +8,8 @@ import {
   canFinalize,
   claimPreview,
   deriveStatus,
+  displayPrice,
+  expectedClearingPrice,
   maxCommitAt,
   priceAt,
   progressBps,
@@ -110,6 +112,29 @@ describe("deriveStatus (FRONTEND_SPEC.md §4)", () => {
     expect(canFinalize(Status.DEMAND_MET)).toBe(false);
     expect(canFinalize(Status.ACTIVE)).toBe(false);
     expect(canFinalize(Status.FINALIZED)).toBe(false);
+  });
+});
+
+describe("expectedClearingPrice / displayPrice (ISSUE-008)", () => {
+  it("uses the crossing price once sold out", () => {
+    const a = auction({ soldOut: true, clearingPrice: E(0.89575), totalCommitted: E(895.75) });
+    expect(expectedClearingPrice(a)).toBe(E(0.89575));
+    expect(displayPrice(a, START + 100n, Status.SOLD_OUT)).toBe(E(0.89575));
+  });
+  it("rounds the implied price up after a lazy clear (500 ETH for 1000 tokens -> 0.5)", () => {
+    const a = auction({ totalCommitted: E(500), clearingPrice: 0n });
+    expect(expectedClearingPrice(a)).toBe(E(0.5));
+    expect(expectedClearingPrice(auction({ totalCommitted: 1n, clearingPrice: 0n, reservePrice: 1n }))).toBe(1n);
+    // The draft headlined the falling live price (0.1 ETH at the end) instead of 0.5.
+    expect(displayPrice(a, START + 1200n, Status.ENDED)).toBe(E(0.5));
+    expect(displayPrice(a, START + 700n, Status.DEMAND_MET)).toBe(E(0.5));
+  });
+  it("falls back to the reserve when the auction never sold out", () => {
+    const a = auction({ totalCommitted: E(50), clearingPrice: 0n });
+    expect(displayPrice(a, START + 1300n, Status.ENDED)).toBe(E(0.1));
+  });
+  it("shows the live price while bidding is open", () => {
+    expect(displayPrice(auction(), START + 600n, Status.ACTIVE)).toBe(E(0.55));
   });
 });
 
