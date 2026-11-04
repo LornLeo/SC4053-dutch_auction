@@ -9,6 +9,7 @@ import {
   timeLeft,
   tokensForEth,
 } from "../lib/auctionMath.js";
+import { chainNow, nextAnchor } from "../lib/chainClock.js";
 
 const POLL_MS = 2000;
 
@@ -22,7 +23,7 @@ export function useAuction(account) {
   const [snapshot, setSnapshot] = useState(null);
   const [error, setError] = useState(null);
   const [, setTick] = useState(0);
-  const anchor = useRef(null); // { chainTs: BigInt, localMs: number }
+  const anchor = useRef(null); // { blockNumber, chainTs: BigInt, localMs } — see lib/chainClock.js
 
   const refresh = useCallback(async () => {
     try {
@@ -94,7 +95,7 @@ export function useAuction(account) {
         .filter(Boolean)
         .reverse();
 
-      anchor.current = { chainTs: BigInt(block.timestamp), localMs: Date.now() };
+      anchor.current = nextAnchor(anchor.current, block, Date.now());
       setSnapshot({
         view: {
           startTime,
@@ -136,9 +137,8 @@ export function useAuction(account) {
 
   if (!snapshot) return { loading: !error, error, refresh };
 
-  const now = anchor.current
-    ? anchor.current.chainTs + BigInt(Math.floor((Date.now() - anchor.current.localMs) / 1000))
-    : 0n;
+  // Time of the next block (what a transaction sent now will see), not the latest block's time.
+  const now = chainNow(anchor.current, Date.now());
   const a = snapshot.view;
   const price = priceAt(a, now);
   const status = deriveStatus(a, now);

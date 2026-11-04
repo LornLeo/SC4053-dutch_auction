@@ -74,10 +74,15 @@ Hiding seller buttons is a UX choice only; the contract enforces access (`NotSel
 
 - The contract uses `block.timestamp`. A Hardhat node gives each new block the wall-clock time (plus any
   `evm_increaseTime` offset), and only when a block is mined.
-- The UI anchors on the latest block: `chainNow = latestBlock.timestamp + secondsSince(localTimeWhenFetched)`,
-  re-anchored on every refresh. It never uses `Date.now()` alone as the auction clock.
-- The countdown is `max(0, endTime - chainNow)`. The price shown is `price(chainNow)` computed with the contract
-  formula, and the refresh reconciles it with `currentPrice()`.
+- The UI anchors on the latest block: `chainNow = latestBlock.timestamp + secondsSince(that block was first seen)`.
+  It never uses `Date.now()` alone as the auction clock.
+- *Changed after review (ISSUE-006):* the original text said "re-anchored on every refresh". That froze the clock,
+  because polling returns the same block until a new one is mined. The anchor now moves only when a **new block**
+  appears (`src/lib/chainClock.js`).
+- The countdown is `max(0, endTime - chainNow)`. The price shown is `price(chainNow)`: the price a transaction sent
+  now will pay in the next block. The `currentPrice()` view is evaluated at the *latest* block, so between blocks it
+  is higher than what a bid would actually pay. The original "reconcile with `currentPrice()`" was dropped for this
+  reason, and `test/FrontendParity.test.js` checks the formula against `currentPrice()` at exact block timestamps instead.
 
 ## 7. Units and formulas (must match the contract exactly)
 
