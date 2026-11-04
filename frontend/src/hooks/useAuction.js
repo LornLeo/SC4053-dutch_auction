@@ -14,6 +14,15 @@ import { chainNow, nextAnchor } from "../lib/chainClock.js";
 
 const POLL_MS = 2000;
 
+// Timestamp the next block will get (ISSUE-011); null if the node has no "pending" block.
+async function pendingTimestamp() {
+  try {
+    const b = await readProvider.send("eth_getBlockByNumber", ["pending", false]);
+    return b?.timestamp ? Number(b.timestamp) : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Everything the UI needs about the auction and the connected account (FRONTEND_SPEC.md §4, §6, §7).
@@ -25,7 +34,7 @@ export function useAuction(account) {
   const [snapshot, setSnapshot] = useState(null);
   const [error, setError] = useState(null);
   const [, setTick] = useState(0);
-  const anchor = useRef(null); // { blockNumber, chainTs: BigInt, localMs } — see lib/chainClock.js
+  const anchor = useRef(null); // { source, blockNumber, chainTs: BigInt, localMs } — see lib/chainClock.js
 
   const refresh = useCallback(async () => {
     try {
@@ -52,6 +61,7 @@ export function useAuction(account) {
         tokenTotalSupply,
         contractEth,
         logs,
+        pendingTs,
       ] = await Promise.all([
         readProvider.getBlock("latest"),
         readAuction.startTime(),
@@ -69,6 +79,7 @@ export function useAuction(account) {
         readToken.totalSupply(),
         readProvider.getBalance(CONFIG.auction.address),
         readProvider.getLogs({ address: CONFIG.auction.address, fromBlock: CONFIG.deployBlock, toBlock: "latest" }),
+        pendingTimestamp(),
       ]);
 
       let me = null;
@@ -97,7 +108,7 @@ export function useAuction(account) {
         .filter(Boolean)
         .reverse();
 
-      anchor.current = nextAnchor(anchor.current, block, Date.now());
+      anchor.current = nextAnchor(anchor.current, block, pendingTs, Date.now());
       setSnapshot({
         view: {
           startTime,
